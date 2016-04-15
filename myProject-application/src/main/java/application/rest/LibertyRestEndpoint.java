@@ -15,8 +15,12 @@
  *******************************************************************************/ 
 package application.rest;
 
+import java.io.StringReader;
+
+import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonObject;
+import javax.json.JsonString;
 import javax.ws.rs.ApplicationPath;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,9 +38,9 @@ import model.Service;
 @ApplicationPath("rest")
 @Path("/")
 public class LibertyRestEndpoint extends Application {
-	
-	private String authorizationToken = "1jl5eti7kkj9pg4eco9hhs952tn7vrctmbp43omkb39frtjo6dv1";
-	private String endpointUrl = "https://servicediscovery.ng.bluemix.net";
+
+    private String authorizationToken;
+    private String endpointUrl;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -49,6 +53,12 @@ public class LibertyRestEndpoint extends Application {
     }
     
     public Service callServiceDiscovery() {
+        String vcapServices = System.getenv("VCAP_SERVICES");
+        if (vcapServices != null) {
+            parseVcapServices(vcapServices);
+        } else {
+            throw new IllegalArgumentException("No VCAP_SERVICES was supplied");
+        }
         Client client = ClientBuilder.newClient();
         String url = endpointUrl + "/api/v1/services/service1";
         System.out.println("Testing " + url);
@@ -60,6 +70,17 @@ public class LibertyRestEndpoint extends Application {
         }
         Service responseObject = response.readEntity(Service.class);
         return responseObject;
+    }
+
+    private void parseVcapServices(String vcapServicesEnv) {
+        JsonObject vcapServices = Json.createReader(new StringReader(vcapServicesEnv)).readObject();
+        JsonArray cloudantObjectArray = vcapServices.getJsonArray("service_discovery");
+        JsonObject cloudantObject = cloudantObjectArray.getJsonObject(0);
+        JsonObject cloudantCredentials = cloudantObject.getJsonObject("credentials");
+        JsonString cloudantUsername = cloudantCredentials.getJsonString("auth_token");
+        authorizationToken = cloudantUsername.getString();
+        JsonString cloudantUrl = cloudantCredentials.getJsonString("url");
+        endpointUrl = cloudantUrl.getString();
     }
     
     public String callService(Service service) {
