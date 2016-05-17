@@ -46,30 +46,41 @@ public class LibertyRestEndpoint extends Application {
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/")
     public Response hello() {
-        Service serviceEndpoint = callServiceDiscovery();
-        String output = callService(serviceEndpoint);
-        return Response.ok("{\"message\": \"Hello from Service 2\", \"output\":" + output + "}",
-                MediaType.APPLICATION_JSON).build();
-    }
-    
-    public Service callServiceDiscovery() {
         String vcapServices = System.getenv("VCAP_SERVICES");
         if (vcapServices != null) {
             parseVcapServices(vcapServices);
         } else {
             throw new IllegalArgumentException("No VCAP_SERVICES was supplied");
         }
+        Service serviceEndpoint1 = callService("service1");
+        String serviceEndpoint3 = getServices();
+        String output = callService(serviceEndpoint1);
+        return Response.ok("{\"message\": \"Hello from Service 2\", \"Service1 output\":" + output + ", \"Service3 output\":" + serviceEndpoint3.toString() + "}",
+                MediaType.APPLICATION_JSON).build();
+    }
+    
+    public Service callService(String serviceName) {
+        Response response = callServiceDiscovery("/api/v1/services/" + serviceName);
+        Service responseObject = response.readEntity(Service.class);
+        return responseObject;
+    }
+    
+    public String getServices() {
+        Response response = callServiceDiscovery("/api/v1/services/");
+        return response.readEntity(String.class);
+    }
+    
+    public Response callServiceDiscovery(String endpoint) {
         Client client = ClientBuilder.newClient();
-        String url = endpointUrl + "/api/v1/services/service1";
+        String url = endpointUrl + endpoint;
         System.out.println("Testing " + url);
         Response response = client.target(url).request().header("Authorization", "Bearer " + authorizationToken).get();
         int responseStatus = response.getStatus();
         System.out.println("callServiceDiscovery responseStatus:" + responseStatus);
         if (responseStatus != 200) {
-        	System.out.println("response is " + response.toString());
+                System.out.println("response is " + response.toString());
         }
-        Service responseObject = response.readEntity(Service.class);
-        return responseObject;
+        return response;
     }
 
     private void parseVcapServices(String vcapServicesEnv) {
